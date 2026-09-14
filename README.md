@@ -70,7 +70,22 @@ It deliberately does **not** use download state. `downloaded` is unreadable on
 subscription tracks, and the `no longer available` tracks never download, so
 "not downloaded" cannot distinguish new songs from permanently-stuck ones.
 
-### `download-genres.applescript` — download coverage, per genre
+### `download-report.applescript` — download coverage (read-only)
+
+```sh
+./download-report.applescript
+```
+
+Reports how much of each genre playlist is downloaded, and totals. **It contains
+no `download` command and cannot start a download**, by construction — queuing
+lives in a separate file so that asking "what is downloaded?" can never begin
+downloading anything.
+
+Presence of `location` is the proxy for download state, since Music exposes no
+readable `downloaded` property on subscription tracks. That is one Apple event
+per track, so a full pass takes several minutes.
+
+### `download-genres.applescript` — download coverage, and queue the gaps
 
 Walks the genre playlists, reports how many of each one's tracks already have a
 local file, and queues the rest for download.
@@ -266,6 +281,14 @@ kept undoing, so reach for them only to reorganize an existing folder in place.
   membership (which came from creation) held every time.
   `build-genres.applescript` issues no `move` and no rename, which is why it
   holds. Verify **nesting and casing**, not just track counts.
+- **Playlist membership duplicates itself over time, and regenerating is the
+  fix.** Observed twice: contents appended three times, and later doubled again
+  eight days after a clean build during which no script edited a single row.
+  Distinct track IDs stayed correct both times, so nothing is lost — only
+  duplicate membership rows accumulate. It was first assumed to be a conflict
+  with local row edits; that was wrong, since it recurs with no edits at all.
+  Re-run `./build-genres.applescript --replace` periodically. Check with
+  `./dedupe-playlists.applescript --dry-run`, which compares rows to distinct IDs.
 - **Rebuild, don't repair.** During this project 63 of 84 genre playlists had
   their entire contents appended three times — 3,833 rows against 2,487 distinct
   tracks — with no script re-run to explain it. `dedupe-playlists.applescript`
