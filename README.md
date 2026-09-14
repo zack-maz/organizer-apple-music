@@ -1,4 +1,4 @@
-# apple-music-organizer
+# organizer-apple-music
 
 AppleScript tools that reorganize an Apple Music library from the command line:
 one playlist per genre, grouped into parent folders, with a backup/restore pair
