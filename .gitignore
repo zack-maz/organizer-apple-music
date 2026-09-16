@@ -7,3 +7,7 @@ backups/
 
 # Compiled AppleScript
 *.scpt
+
+# App build products (see app/build.sh)
+app/.build/
+app/dist/

@@ -16,7 +16,7 @@ changes; it is the first thing to read when picking the work back up.
 | Parent folders | 13 (inside `genres`) |
 | Tracks filed | 2,494 (rows = distinct, 0 duplicates) |
 | Distinct albums in library | 1,669 |
-| Download state | not measured this session |
+| Download state | 1,798 of 2,495 downloaded (72%), 677 pending, 20 unavailable — measured 2026-09-16 with `download-report` |
 
 Everything is lowercase — the `genres` folder, all 13 parent folders, all 84
 playlists. Nothing is loose at the root. `wont download` sits at the **top
@@ -121,4 +121,4 @@ while one runs. Stopping it is a UI action.
 
 The Music.app AppleScript behaviors these scripts depend on — which commands
 work, which fail and with what error codes — are summarised at the end of
-README.md under "Notes for editing these scripts".
+SCRIPTS.md under "Notes for editing these scripts".
