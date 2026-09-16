@@ -14,11 +14,15 @@
 -- so the list reads chronologically.
 --
 -- Usage:
---   ./whats-new.applescript [--days N] [--folder NAME] [--all]
+--   ./whats-new.applescript [--days N] [--folder NAME] [--all] [--json] [--progress]
 --
 --   --days N     Also list everything added in the last N days (default: off).
 --   --all        List every unorganized track (default caps the list at 40).
 --   --folder     Genre folder to compare against (default: genres).
+--   --json       Append one machine-readable summary line after the report
+--                (library, filed, playlists, folders, unfiled). Used by the app.
+--   --progress   Emit one machine-readable line per unfiled track on stderr
+--                (see the progress handlers at the end of the file). Used by the app.
 --
 
 use AppleScript version "2.4"
@@ -26,11 +30,16 @@ use framework "Foundation"
 use scripting additions
 
 property defaultFolderName : "genres"
+-- --progress state; see the progress handlers at the end of the file
+property progressOn : false
+property progressDone : 0
+property progressTotal : 0
 
 on run argv
 	set folderName to defaultFolderName
 	set dayWindow to 0
 	set showAll to false
+	set jsonOut to false
 	set capAt to 40
 
 	set i to 1
@@ -38,6 +47,8 @@ on run argv
 		set a to item i of argv
 		if a is "--all" then
 			set showAll to true
+		else if a is "--json" then
+			set jsonOut to true
 		else if a is "--days" then
 			set i to i + 1
 			if i > (count of argv) then error "--days needs a value."
@@ -46,8 +57,10 @@ on run argv
 			set i to i + 1
 			if i > (count of argv) then error "--folder needs a value."
 			set folderName to item i of argv
+		else if a is "--progress" then
+			set progressOn to true
 		else if a is "-h" or a is "--help" then
-			return "Usage: whats-new.applescript [--days N] [--all] [--folder NAME]"
+			return "Usage: whats-new.applescript [--days N] [--all] [--folder NAME] [--json] [--progress]"
 		else
 			error "Unknown option: " & a
 		end if
@@ -87,8 +100,20 @@ on run argv
 		end repeat
 	end tell
 
+	-- parent folders inside the genre folder; a folder cannot enumerate its
+	-- own children, so walk every folder playlist and check its parent
+	set folderCount to 0
+	tell application "Music"
+		repeat with fi from 1 to (count of folder playlists)
+			try
+				if (name of parent of folder playlist fi) is folderName then set folderCount to folderCount + 1
+			end try
+		end repeat
+	end tell
+
 	-- library minus genre tree = added since the last rebuild
 	set pending to {}
+	set pendingIdx to {}
 	set cutoff to (current date) - (dayWindow * 86400)
 	set recent to {}
 
@@ -96,9 +121,20 @@ on run argv
 		set thisID to (item k of idList) as text
 		set wasFiled to (filed's containsObject:thisID) as boolean
 		set entry to my stampOf(item k of addedList) & "  " & (item k of whoList) & " — " & (item k of titleList) & "   [" & my genreOf(item k of genreList) & "]"
-		if not wasFiled then set end of pending to entry
+		if not wasFiled then
+			set end of pending to entry
+			set end of pendingIdx to k
+		end if
 		if dayWindow > 0 and (item k of addedList) ≥ cutoff then set end of recent to entry
 	end repeat
+
+	-- the feed lists the unfiled tracks, with the genre playlist each would go to
+	my progressBegin(count of pendingIdx, "tracks")
+	repeat with pk in pendingIdx
+		set k to contents of pk
+		my progressItem("unfiled", my genreOf(item k of genreList), item k of whoList, item k of titleList)
+	end repeat
+	my progressEnd()
 
 	set rowsOut to {}
 	set rowsOut to rowsOut & {"Library:        " & libTotal & " tracks"}
@@ -117,7 +153,7 @@ on run argv
 		end repeat
 		if lim < (count of shown) then set rowsOut to rowsOut & {"  … and " & ((count of shown) - lim) & " more (pass --all)"}
 		set rowsOut to rowsOut & {""}
-		set rowsOut to rowsOut & {"Re-file them:  ./organize-by-genre.applescript --replace && ./group-genres.applescript && ./lowercase-names.applescript"}
+		set rowsOut to rowsOut & {"Re-file them:  ./build-genres.applescript --replace"}
 	end if
 
 	if dayWindow > 0 then
@@ -130,6 +166,11 @@ on run argv
 			set rowsOut to rowsOut & {"  " & (item k of shown2)}
 		end repeat
 		if lim2 < (count of shown2) then set rowsOut to rowsOut & {"  … and " & ((count of shown2) - lim2) & " more (pass --all)"}
+	end if
+
+	-- trailing single-line JSON for programs; the human report above is unchanged
+	if jsonOut then
+		set rowsOut to rowsOut & {"{\"library\":" & libTotal & ",\"filed\":" & ((filed's |count|()) as integer) & ",\"playlists\":" & playlistCount & ",\"folders\":" & folderCount & ",\"unfiled\":" & (count of pending) & "}"}
 	end if
 
 	set AppleScript's text item delimiters to linefeed
@@ -165,3 +206,92 @@ on newestFirst(lst)
 	set sorted to ((current application's NSArray's arrayWithArray:lst)'s sortedArrayUsingSelector:"compare:") as list
 	return reverse of sorted
 end newestFirst
+
+-- Progress protocol, on with --progress (off by default, so the CLI output is
+-- unchanged). One machine-readable line per event, via `log`, so it lands on
+-- stderr as it happens; the app turns them into a progress bar and live feed.
+--
+--   @@ begin <TAB> total=N <TAB> unit=tracks|playlists|downloads
+--   @@ item  <TAB> i=n <TAB> of=N <TAB> kind=added <TAB> id=… <TAB> playlist=… <TAB> artist=… <TAB> title=…
+--   @@ end
+--
+-- Fields are tab-separated key=value pairs (names may hold spaces, so tab is
+-- the separator); tabs and newlines inside a value become spaces. An item
+-- without i/of is an uncounted event, such as a playlist created or queued.
+-- `id` is the track's persistent ID when known: a later item with the same id
+-- updates the earlier row in the app (pending -> downloaded) instead of adding
+-- one. Items without id always add a row.
+on progressBegin(howMany, unitName)
+	if not progressOn then return
+	set progressDone to 0
+	set progressTotal to howMany
+	my progressEmit("begin", {{"total", howMany}, {"unit", unitName}})
+end progressBegin
+
+-- one counted item: advances n of N
+on progressItem(itemKind, plVal, whoVal, titleVal)
+	my progressRow(true, itemKind, "", plVal, whoVal, titleVal)
+end progressItem
+
+-- one counted item with a track identity
+on progressItemID(itemKind, idVal, plVal, whoVal, titleVal)
+	my progressRow(true, itemKind, idVal, plVal, whoVal, titleVal)
+end progressItemID
+
+-- an uncounted event, e.g. a playlist created or queued
+on progressMark(itemKind, plVal, titleVal)
+	my progressRow(false, itemKind, "", plVal, "", titleVal)
+end progressMark
+
+-- an uncounted event with a track identity, e.g. a track still pending
+on progressMarkID(itemKind, idVal, plVal, whoVal, titleVal)
+	my progressRow(false, itemKind, idVal, plVal, whoVal, titleVal)
+end progressMarkID
+
+on progressRow(counted, itemKind, idVal, plVal, whoVal, titleVal)
+	if not progressOn then return
+	set pairs to {}
+	if counted then
+		set progressDone to progressDone + 1
+		set pairs to {{"i", progressDone}, {"of", progressTotal}}
+	end if
+	set pairs to pairs & {{"kind", itemKind}}
+	if (idVal as text) is not "" then set pairs to pairs & {{"id", idVal}}
+	set pairs to pairs & {{"playlist", plVal}, {"artist", whoVal}, {"title", titleVal}}
+	my progressEmit("item", pairs)
+end progressRow
+
+on progressEnd()
+	if not progressOn then return
+	my progressEmit("end", {})
+end progressEnd
+
+on progressEmit(evName, pairs)
+	set outParts to {"@@ " & evName}
+	repeat with pr in pairs
+		set end of outParts to (item 1 of pr) & "=" & my progressClean(item 2 of pr)
+	end repeat
+	set AppleScript's text item delimiters to tab
+	set progressLine to outParts as text
+	set AppleScript's text item delimiters to ""
+	log progressLine
+end progressEmit
+
+-- a value as one line: missing value -> "", tabs and newlines -> spaces
+on progressClean(v)
+	if v is missing value then return ""
+	set s to v as text
+	set AppleScript's text item delimiters to {tab, linefeed, return}
+	set bits to text items of s
+	set AppleScript's text item delimiters to " "
+	set s to bits as text
+	set AppleScript's text item delimiters to ""
+	return s
+end progressClean
+
+-- item k of a bulk-read list, or "" when the list is shorter (a playlist
+-- that changed under us); never errors
+on progressAt(lst, k)
+	if k > (count of lst) then return ""
+	return item k of lst
+end progressAt
