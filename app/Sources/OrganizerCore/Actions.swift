@@ -16,6 +16,16 @@ public enum ActionGroup: String, CaseIterable, Identifiable, Sendable {
 
     public var id: String { rawValue }
     public var kinds: [ActionKind] { ActionKind.allCases.filter { $0.group == self } }
+
+    /// Why a group is shown but cannot be run, or nil when it can. Downloads
+    /// are off: queued tracks can sit pending indefinitely, and a script can
+    /// neither see why nor do anything about it.
+    public var disabledReason: String? {
+        switch self {
+        case .downloads: return "Disabled. Queued downloads can stall with no way to see or fix it from a script."
+        case .build, .backup: return nil
+        }
+    }
 }
 
 /// One script the app can run. The raw value is the script's basename, so the

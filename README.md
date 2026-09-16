@@ -49,12 +49,14 @@ up the duplicate playlist entries that iCloud sync tends to create over time.
 | Script | What it does |
 | --- | --- |
 | `whats-new` | Lists songs that aren't in any genre playlist yet. |
-| `download-report` | Shows how much of each genre is downloaded. Read-only. |
-| `download-genres` | Same report, then queues missing songs for download. |
-| `watch-downloads` | Tells you each song as its queued download finishes. Read-only. |
 | `dedupe-playlists` | Removes repeated songs within the genre playlists. |
 | `backup-playlists` | Saves your playlists to files on disk. |
 | `restore-playlists` | Recreates playlists from a backup. |
+
+The download scripts (`download-report`, `download-genres`,
+`watch-downloads`) are still in the repo but **not supported**: queued
+downloads can stall indefinitely with no way to see why or fix it from a
+script. Download songs from the Music app itself. They are disabled in the app.
 
 ## Good to know
 
@@ -63,9 +65,6 @@ up the duplicate playlist entries that iCloud sync tends to create over time.
 - **Rebuild rather than edit.** iCloud tends to undo renames and moves made to
   existing playlists, but leaves newly created ones alone — which is why the
   build script creates everything in its final form in one go.
-- **Downloads happen slowly in the background.** Queuing is instant; Music
-  works through it over hours and can't be stopped from a script.
-  `watch-downloads` reports each song as it lands.
 
 ## App
 

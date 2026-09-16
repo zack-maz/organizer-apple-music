@@ -29,7 +29,7 @@ enum Docs {
     /// Read before the entries: the rule every script is built around.
     static let preamble = "Every script drives Music.app through AppleScript. Nothing touches audio files and no track is ever moved or deleted; only playlists are created and removed. The one rule: create, never modify. iCloud sync reverts renames, moves and row edits on synced playlists but lets creations stand, so the scripts build the final shape in one pass and rebuild rather than repair."
 
-    static let dryRunNote = "In this app every command that changes the library runs with --dry-run first. The console shows the plan, then offers Run for real."
+    static let dryRunNote = "In this app every command that changes the library runs with --dry-run first. The console shows the plan, then offers Run for real. The Downloads commands are disabled: queued downloads can stall indefinitely, and a script can neither see why nor fix it. They are documented below for command-line use only."
 
     static let all: [CommandDoc] = ActionKind.allCases.map(doc(for:))
 

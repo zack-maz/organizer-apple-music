@@ -105,6 +105,18 @@ It deliberately does **not** use download state. `downloaded` is unreadable on
 subscription tracks, and the `no longer available` tracks never download, so
 "not downloaded" cannot distinguish new songs from permanently-stuck ones.
 
+### Download scripts — unsupported
+
+`download-report`, `download-genres` and `watch-downloads` are kept for
+reference but **do not work reliably**, and the app shows them greyed out.
+After a queue was handed to Music, tracks stayed pending indefinitely: on
+2026-09-16 two subscription tracks (`música mexicana`, `pop latino`) still had
+no local file hours later, and nothing had been written under
+`~/Music/Music/Media.localized` for three hours. Music exposes no queue state,
+no error, and no retry to AppleScript, so a script can report a stall but never
+explain or clear it. Download from the Music app instead. The sections below
+describe what the scripts do if run by hand.
+
 ### `download-report.applescript` — download coverage (read-only)
 
 ```sh
@@ -166,8 +178,7 @@ pending, and killing it any time is safe: it writes nothing. It contains no
 With `--progress` it emits `kind=pending` for every pending track at the start
 and `kind=downloaded` as each one lands, each carrying `id=<persistent ID>`, so
 the app updates the row in place; `i`/`of` count downloads so far against
-pending at start. The app starts it automatically after a real
-`download-genres` run that queued anything.
+pending at start.
 
 ### `mark-unavailable.applescript` — collect the tracks that can never download
 

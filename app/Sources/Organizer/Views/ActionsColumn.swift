@@ -17,15 +17,24 @@ struct ActionsColumn: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(ActionGroup.allCases) { group in
-                    Text(group.rawValue)
-                        .label()
-                        .id(group == .build ? "top" : group.id)
-                        .padding(.horizontal, 28)
-                        .padding(.top, group == .build ? 22 : 30)
-                        .padding(.bottom, 10)
-                    ForEach(group.kinds) { kind in
-                        ActionRow(kind: kind)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(group.rawValue).label()
+                        if let reason = group.disabledReason {
+                            Text(reason).small(Palette.muted)
+                        }
                     }
+                    .id(group == .build ? "top" : group.id)
+                    .padding(.horizontal, 28)
+                    .padding(.top, group == .build ? 22 : 30)
+                    .padding(.bottom, 10)
+                    // a disabled group stays visible but greyed and inert
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(group.kinds) { kind in
+                            ActionRow(kind: kind)
+                        }
+                    }
+                    .disabled(group.disabledReason != nil)
+                    .opacity(group.disabledReason != nil ? 0.35 : 1)
                 }
                 ScriptsFooter()
                     .padding(.top, 36)
@@ -67,7 +76,7 @@ private struct ActionRow: View {
     }
 
     private var canRun: Bool {
-        if model.isRunning { return false }
+        if model.isRunning || kind.group.disabledReason != nil { return false }
         if kind == .restorePlaylists { return !model.options.restoreDirectory.isEmpty }
         return true
     }

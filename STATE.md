@@ -16,7 +16,7 @@ changes; it is the first thing to read when picking the work back up.
 | Parent folders | 13 (inside `genres`) |
 | Tracks filed | 2,494 (rows = distinct, 0 duplicates) |
 | Distinct albums in library | 1,669 |
-| Download state | 1,798 of 2,495 downloaded (72%), 677 pending, 20 unavailable — measured 2026-09-16 with `download-report` |
+| Download state | 2,471 of 2,495 have a local file; 20 unavailable, 2 stuck, 2 streams (2026-09-16 afternoon) |
 
 Everything is lowercase — the `genres` folder, all 13 parent folders, all 84
 playlists. Nothing is loose at the root. `wont download` sits at the **top
@@ -67,17 +67,27 @@ does.
 ./build-genres.applescript --replace       # fixes it, and picks up new tracks
 ```
 
-## Downloads — deliberately not run
+## Downloads — unsupported, disabled in the app
 
-The download queue was **not touched this session.** As of 2026-09-05 roughly
-1,112 of 2,487 tracks had local files; eight days on, that number is unknown and
-should not be assumed.
+**Decided 2026-09-16: download tooling does not work reliably and is no longer
+supported.** The scripts (`download-report`, `download-genres`,
+`watch-downloads`) stay in the repo; the app greys them out.
 
-Download tooling is split in two so that checking can never start a download:
+What happened: Music's persisted queue worked through most of the library
+during the day (677 pending at midday), then stalled. A full read-only scan
+that afternoon found only four tracks with no local file, none of them
+`no longer available`:
 
-- `download-report.applescript` — **read-only**, contains no `download` command
-  at all. Use this to check coverage.
-- `download-genres.applescript` — reports *and* queues the gaps.
+| Track | Genre playlist | What it is |
+| --- | --- | --- |
+| La Energía Norteña — Los Ángeles Existen | `música mexicana` | subscription track, stuck |
+| Rawayana & Manuel Turizo — Inglés En Miami | `pop latino` | subscription track, stuck |
+| two tracks titled with numeric IDs (Destroy Lonely, WAAX) | none | `URL track`, internet stream, can never download |
+
+Nothing had been written under `~/Music/Music/Media.localized` for three hours,
+so the two subscription tracks are stuck, not slow. Music exposes no queue
+state, no error and no retry to AppleScript, so a script can report a stall but
+never explain or clear it. Download from the Music app itself.
 
 A queued download cannot be cancelled from a script, and Music may refuse to quit
 while one runs. Stopping it is a UI action.
